@@ -1,7 +1,18 @@
 /**
  * Cloudflare Pages Function: /api/rate
- * frankfurter.app API를 통해 USD → KRW 실시간 환율을 반환합니다.
+ * open.er-api.com 기반으로 한국인 여행 TOP 10 국가 통화의 KRW 환율을 반환합니다.
+ * 반환값: { rates: { USD: 1350, JPY: 9.2, ... } }  → 각 통화 1단위당 KRW
  */
+
+const CURRENCIES = ["USD", "JPY", "THB", "VND", "PHP", "HKD", "TWD", "SGD", "CNY", "EUR"];
+
+// API 장애 시 사용할 폴백 환율 (수동 갱신 필요)
+const FALLBACK_RATES = {
+  USD: 1350, JPY: 9.2,  THB: 38,   VND: 0.053,
+  PHP: 24,   HKD: 173,  TWD: 42,   SGD: 1010,
+  CNY: 186,  EUR: 1480,
+};
+
 export async function onRequestGet(context) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -9,38 +20,44 @@ export async function onRequestGet(context) {
   };
 
   try {
-    const response = await fetch(
-      "https://api.frankfurter.app/latest?from=USD&to=KRW",
-      { cf: { cacheTtl: 3600, cacheEverything: true } }
-    );
+    // open.er-api.com — 무료, API Key 불필요, 160+ 통화 지원
+    const res = await fetch("https://open.er-api.com/v6/latest/USD", {
+      cf: { cacheTtl: 3600, cacheEverything: true },
+    });
 
-    if (!response.ok) {
-      throw new Error(`Frankfurter API 오류: ${response.status}`);
-    }
+    if (!res.ok) throw new Error(`API 오류: ${res.status}`);
 
-    const data = await response.json();
-    const rate = data.rates?.KRW;
+    const data = await res.json();
+    const raw  = data.rates;
 
-    if (!rate) {
-      throw new Error("KRW 환율 데이터를 찾을 수 없습니다.");
+    if (!raw?.KRW) throw new Error("KRW 환율 데이터 없음");
+
+    const krwPerUsd = raw.KRW;
+
+    // 각 통화 1단위 = ? KRW  (cross rate)
+    const rates = {};
+    for (const cur of CURRENCIES) {
+      if (raw[cur]) {
+        rates[cur] = Math.round((krwPerUsd / raw[cur]) * 100) / 100;
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        rate: Math.round(rate),
-        date: data.date,
-        source: "frankfurter.app",
+        rates,
+        date: data.time_last_update_utc?.slice(0, 16) ?? new Date().toISOString().slice(0, 10),
+        source: "open.er-api.com",
       }),
       { status: 200, headers: corsHeaders }
     );
+
   } catch (err) {
-    // 폴백: 고정 환율 반환 (API 장애 시)
     return new Response(
       JSON.stringify({
         success: false,
-        rate: 1350,
-        date: new Date().toISOString().split("T")[0],
+        rates: FALLBACK_RATES,
+        date: new Date().toISOString().slice(0, 10),
         source: "fallback",
         error: err.message,
       }),
