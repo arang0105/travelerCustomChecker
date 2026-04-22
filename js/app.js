@@ -8,28 +8,70 @@
    ===================================================== */
 const CALCULATION_RULES = {
 
-  // 주류 품목별 간이세율 (면세 한도 초과 시 전액 과세)
+  /* ── 주류 품목별 간이세율 (관세청 고시, 면세 한도 초과 시 전액 과세) ─── */
   liquor: {
-    WINE:     { label: "🍷 포도주 (와인)",                    rate: 0.68  },
-    WHISKEY:  { label: "🥃 위스키 / 브랜디 / 보드카 / 진 / 럼", rate: 1.55  },
-    SAKE:     { label: "🍶 사케 (일본청주)",                  rate: 0.68  },
-    BEER:     { label: "🍺 맥주",                             rate: 0.46  },
-    // ※ 맥주는 실제로 리터당 세금(종량세) 방식이나 단순화를 위해 46% 적용 (추후 고도화 예정)
-    GAOLIANG: { label: "🍾 고량주",                           rate: 1.55  },
-    OTHER:    { label: "🍸 기타 주류",                        rate: 0.68  },
+    WINE:     { label: "🍷 포도주 (와인)",                       rate: 0.68  },
+    WHISKEY:  { label: "🥃 위스키 / 브랜디 / 보드카 / 진 / 럼",  rate: 1.55  },
+    SAKE:     { label: "🍶 사케 (일본청주)",                     rate: 0.68  },
+    BEER:     { label: "🍺 맥주",                                rate: 0.46  },
+    // ※ 맥주는 실제로 리터당 세금(종량세)이나, 단순화를 위해 46% 적용 (추후 고도화 예정)
+    GAOLIANG: { label: "🍾 고량주 / 배갈",                       rate: 1.55  },
+    FRUIT:    { label: "🍑 과실주 (매실주·복숭아주 등)",          rate: 0.68  },
+    LIQUEUR:  { label: "🍹 리큐르 / 칵테일",                     rate: 1.55  },
+    OTHER:    { label: "🍸 기타 주류",                           rate: 0.68  },
   },
 
-  // 일반 품목 세율 카테고리
+  /* ── 일반 품목 간이세율 (관세청 고시 기준) ──────────────────────────
+     출처: 관세청 여행자 휴대품 간이세율표
+     ※ 의류·신발·식품은 25%, 대부분 일반물품은 20% 기본 적용
+     ※ 모피제품 19%, 녹용 21% 등 일부 특수 품목 별도 세율 존재  ─── */
   general: {
-    GENERAL:  { label: "일반 물품",           rate: 0.20, badge: "20%",  color: "bg-blue-100 text-blue-700"   },
-    CLOTHING: { label: "의류 · 직물제품",     rate: 0.25, badge: "25%",  color: "bg-violet-100 text-violet-700" },
-    LUXURY:   { label: "고가 물품 (가방·시계)", rate: 0.20, badge: "20%+", color: "bg-amber-100 text-amber-700"  },
-    // ⚠️ 고가 물품(200만원 초과 가방·시계 등): 기본 간이세율 20% 적용 후
-    //    과세가격이 200만원 초과 시 초과분에 개별소비세 로직 별도 적용 필요.
+    GENERAL:    { label: "기타 일반 물품",             rate: 0.20, badge: "20%",  color: "bg-blue-100 text-blue-700"     },
+    CLOTHING:   { label: "의류 · 섬유 · 신발류",       rate: 0.25, badge: "25%",  color: "bg-violet-100 text-violet-700" },
+    FOOD:       { label: "식료품 · 음식료품",           rate: 0.25, badge: "25%",  color: "bg-orange-100 text-orange-700" },
+    BAG:        { label: "가방 · 핸드백 · 여행용품",   rate: 0.20, badge: "20%",  color: "bg-pink-100 text-pink-700"     },
+    COSMETICS:  { label: "화장품 · 향수 · 뷰티",       rate: 0.20, badge: "20%",  color: "bg-fuchsia-100 text-fuchsia-700"},
+    ELECTRONIC: { label: "전자제품 (카메라·노트북 등)", rate: 0.20, badge: "20%",  color: "bg-sky-100 text-sky-700"       },
+    SPORTS:     { label: "완구 · 스포츠 · 레저용품",   rate: 0.20, badge: "20%",  color: "bg-emerald-100 text-emerald-700"},
+    MEDICINE:   { label: "의약품 · 건강보조식품",       rate: 0.20, badge: "20%",  color: "bg-teal-100 text-teal-700"     },
+    INSTRUMENT: { label: "악기",                       rate: 0.20, badge: "20%",  color: "bg-indigo-100 text-indigo-700" },
+    JEWELRY:    { label: "귀금속 · 보석류",             rate: 0.20, badge: "20%",  color: "bg-yellow-100 text-yellow-700" },
+    FUR:        { label: "모피제품",                   rate: 0.19, badge: "19%",  color: "bg-amber-100 text-amber-700"   },
+    ANTLER:     { label: "녹용",                       rate: 0.21, badge: "21%",  color: "bg-lime-100 text-lime-700"     },
+    WATCH:      { label: "시계 (고가품 개별소비세 별도)", rate: 0.20, badge: "20%+", color: "bg-rose-100 text-rose-700"     },
+    // ⚠️ 고가 물품(과세가격 200만원 초과 시계·보석 등): 간이세율 20% 기본 적용 후
+    //    초과분에 개별소비세 별도 산출 필요
     //    개별소비세 = (과세가격 - 2,000,000) × 20%
-    //    + 교육세 = 개별소비세 × 30%
-    //    + 농어촌특별세 = 개별소비세 × 10%
-    //    정확한 계산은 관세청 ItemTaxCalculation.do 참고
+    //    교육세     = 개별소비세 × 30%
+    //    농어촌특별세 = 개별소비세 × 10%
+    //    정확한 계산: 관세청 ItemTaxCalculation.do 참고
+  },
+
+  /* ── 담배 종류 (관세청 고시 종량세 기준) ──────────────────────────
+     ※ 담배는 가격 기준 %세율이 아닌 수량·무게당 종량세 방식
+     ※ 관세(40%) + 개별소비세 + 담배소비세(지방세) + 지방교육세 + 부가세 합산
+     ※ 이 계산기에서는 면세 초과 여부 판정 + 종량세 안내에 집중  ─── */
+  cigarette: {
+    FILTER:   { label: "🚬 궐련 (필터담배)",              unit: "개비", note: "관세 40% + 약 ₩1,601/20개비 (종량세)"  },
+    ECIG_STK: { label: "💨 전자담배 — 궐련형 (아이코스 등)", unit: "개비", note: "관세 40% + 약 ₩529/20개비 (종량세)"    },
+    ECIG_LIQ: { label: "💧 전자담배 — 니코틴 용액형",      unit: "ml",   note: "관세 40% + 약 ₩1,799/ml (종량세)"     },
+    ECIG_ETC: { label: "🌿 전자담배 — 기타형 (액상 등)",   unit: "g",    note: "관세 40% + 약 ₩110/g (종량세)"        },
+    CIGAR:    { label: "🪵 엽궐련 (시가 / 시가릴로)",      unit: "g",    note: "관세 40% + 약 ₩1,997/g (종량세)"     },
+    PIPE:     { label: "🪈 파이프담배",                   unit: "g",    note: "관세 40% + 약 ₩30/g (종량세)"         },
+    KAKRYUN:  { label: "✂️ 각련 (손말이담배)",              unit: "g",    note: "관세 40% + 약 ₩30/g (종량세)"         },
+    CHEW:     { label: "🫙 씹는담배 / 냄새맡는담배",        unit: "g",    note: "관세 40% + 약 ₩215/g (종량세)"        },
+  },
+
+  /* ── 담배 면세 한도 (종류별) ─── */
+  cigaretteLimit: {
+    FILTER:   { qty: 200, unit: "개비" },
+    ECIG_STK: { qty: 200, unit: "개비" },
+    ECIG_LIQ: { qty: 20,  unit: "ml"   },
+    ECIG_ETC: { qty: 110, unit: "g"    },
+    CIGAR:    { qty: 50,  unit: "개비"  }, // 엽궐련 50개비 면세
+    PIPE:     { qty: 250, unit: "g"    },
+    KAKRYUN:  { qty: 250, unit: "g"    },
+    CHEW:     { qty: 250, unit: "g"    },
   },
 
   // 면세 한도 (USD 기준)
@@ -228,6 +270,32 @@ function updateSymbols() {
     $(id).step  = step;
     $(id).value = "";
   });
+  $("cigQtyInput").value = "";
+}
+
+/* ─── 담배 종류 변경 시 UI 갱신 ─────────────────── */
+function onCigaretteTypeChange() {
+  const key   = $("cigaretteType").value;
+  const rule  = CALCULATION_RULES.cigarette[key];
+  const limit = CALCULATION_RULES.cigaretteLimit[key];
+
+  // 수량 단위 레이블 갱신
+  $("cigQtyUnit").textContent  = rule.unit;
+  $("cigQtyInput").placeholder = `면세한도: ${limit.qty}${limit.unit}`;
+
+  // 종량세 안내 문구 갱신
+  $("cigTaxNote").textContent  = `ℹ️ ${rule.note}`;
+  $("cigTaxNote").classList.remove("hidden");
+}
+
+function getCigInfo() {
+  const key   = $("cigaretteType").value;
+  const rule  = CALCULATION_RULES.cigarette[key];
+  const limit = CALCULATION_RULES.cigaretteLimit[key];
+  const qty   = parseFloat($("cigQtyInput").value)     || 0;
+  const price = parseFloat($("cigarettePrice").value)  || 0;
+  const isFree = qty <= limit.qty;
+  return { key, rule, limit, qty, price, isFree };
 }
 
 /* ─── 품목 관리 ─────────────────────────────────── */
@@ -398,15 +466,19 @@ function calculate() {
   }
 
   /* ── ④ 담배 ── */
-  const cigLocal  = parseFloat($("cigarettePrice").value) || 0;
-  const cigCount  = parseFloat($("cigaretteCount").value) || 0;
-  const cigKRW    = locKRW(cigLocal);
-  const cigFree   = cigCount <= 200;
-  const cigTaxKRW = cigFree ? 0 : cigKRW * 0.20;
+  const { rule: cigRule, limit: cigLimit, qty: cigQty, price: cigPrice, isFree: cigFree } = getCigInfo();
+  const cigKRW    = locKRW(cigPrice);
+  // 담배는 종량세(수량당 고정액)가 주이나, 관세(40%) 기준으로 근사 계산
+  // 실제 납부세액은 종량세 안내 문구 참조
+  const cigTaxKRW = cigFree ? 0 : cigKRW * 0.40;
 
-  if (cigLocal > 0) {
-    if (cigFree) setMsg("cigaretteMsg", "✅ 담배 면세 조건 충족", true);
-    else         setMsg("cigaretteMsg", `⚠️ 수량 초과 (${cigCount}개비 > 200개비)`, false);
+  if (cigPrice > 0 || cigQty > 0) {
+    if (cigFree) {
+      setMsg("cigaretteMsg", `✅ 담배 면세 조건 충족 (${cigQty}${cigRule.unit} ≤ ${cigLimit.qty}${cigLimit.unit})`, true);
+    } else {
+      setMsg("cigaretteMsg",
+        `⚠️ 수량 초과 (${cigQty}${cigRule.unit} > ${cigLimit.qty}${cigLimit.unit}) — 관세 40% 기준 (종량세 별도)`, false);
+    }
   } else {
     $("cigaretteMsg").classList.add("hidden");
   }
@@ -428,7 +500,7 @@ function calculate() {
     c, itemDetails, generalTaxKRW,
     alcLocal, alcKRW, alcFree, alcTaxKRW, alcRule,
     perfLocal, perfKRW, perfFree, perfTaxKRW,
-    cigLocal,  cigKRW, cigFree,  cigTaxKRW,
+    cigPrice, cigKRW, cigFree, cigTaxKRW, cigRule, cigQty, cigLimit,
     rawTaxKRW, selfDeclare, discount,
   });
 
@@ -483,7 +555,7 @@ function renderBreakdown(d) {
   }
 
   /* 별도 면세 품목 */
-  if (d.alcLocal > 0 || d.perfLocal > 0 || d.cigLocal > 0) {
+  if (d.alcLocal > 0 || d.perfLocal > 0 || d.cigPrice > 0 || d.cigQty > 0) {
     divider("별도 면세 품목");
     if (d.alcLocal > 0) {
       row(
@@ -492,7 +564,12 @@ function renderBreakdown(d) {
       );
     }
     if (d.perfLocal > 0) row(`🌸 향수`, d.perfFree ? "✅ 면세" : `세액 ₩${fmt(d.perfTaxKRW)}`);
-    if (d.cigLocal  > 0) row(`🚬 담배`, d.cigFree  ? "✅ 면세" : `세액 ₩${fmt(d.cigTaxKRW)}`);
+    if (d.cigPrice  > 0 || d.cigQty > 0) {
+      const cigLabel = d.cigFree
+        ? "✅ 면세"
+        : `세액 ₩${fmt(d.cigTaxKRW)} <span class="text-xs text-slate-400">(종량세 별도)</span>`;
+      row(`🚬 담배 <span class="text-xs text-slate-400">${d.cigRule.label}</span>`, cigLabel);
+    }
   }
 
   /* 합산 및 감면 */

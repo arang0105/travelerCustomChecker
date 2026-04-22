@@ -126,8 +126,8 @@
             <span class="text-base">🚬</span>
             <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">담배 별도</span>
           </div>
-          <p class="text-lg font-extrabold text-slate-800">200개비</p>
-          <p class="text-xs text-slate-500 mt-0.5">궐련 기준</p>
+          <p class="text-lg font-extrabold text-slate-800">종류별 상이</p>
+          <p class="text-xs text-slate-500 mt-0.5">궐련 200개비 기준</p>
         </div>
       </div>
     </div>
@@ -184,7 +184,9 @@
               <option value="WHISKEY">🥃 위스키 / 브랜디 / 보드카 / 진 / 럼 — 155%</option>
               <option value="SAKE">🍶 사케 (일본청주) — 68%</option>
               <option value="BEER">🍺 맥주 — 46% (단순화)</option>
-              <option value="GAOLIANG">🍾 고량주 — 155%</option>
+              <option value="GAOLIANG">🍾 고량주 / 배갈 — 155%</option>
+              <option value="FRUIT">🍑 과실주 (매실주·복숭아주 등) — 68%</option>
+              <option value="LIQUEUR">🍹 리큐르 / 칵테일 — 155%</option>
               <option value="OTHER">🍸 기타 주류 — 68%</option>
             </select>
           </div>
@@ -232,8 +234,23 @@
       <div class="bg-slate-50/80 rounded-2xl p-4 border border-slate-100">
         <p class="text-xs font-bold text-slate-600 flex items-center gap-1.5 mb-3">
           🚬 담배
-          <span class="font-normal text-slate-400">(200개비 이하 면세)</span>
+          <span class="font-normal text-slate-400">(종류별 면세한도 상이)</span>
         </p>
+        <!-- 담배 종류 선택 -->
+        <div class="mb-2">
+          <select id="cigaretteType"
+            class="field-focus w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer"
+            onchange="onCigaretteTypeChange()">
+            <option value="FILTER">🚬 궐련 (필터담배) — 면세 200개비</option>
+            <option value="ECIG_STK">💨 전자담배 — 궐련형 (아이코스 등) — 면세 200개비</option>
+            <option value="ECIG_LIQ">💧 전자담배 — 니코틴 용액형 — 면세 20ml</option>
+            <option value="ECIG_ETC">🌿 전자담배 — 기타형 (액상 등) — 면세 110g</option>
+            <option value="CIGAR">🪵 엽궐련 (시가 / 시가릴로) — 면세 50개비</option>
+            <option value="PIPE">🪈 파이프담배 — 면세 250g</option>
+            <option value="KAKRYUN">✂️ 각련 (손말이담배) — 면세 250g</option>
+            <option value="CHEW">🫙 씹는담배 / 냄새맡는담배 — 면세 250g</option>
+          </select>
+        </div>
         <div class="grid grid-cols-2 gap-2">
           <div class="relative">
             <span id="cigSymbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
@@ -241,11 +258,12 @@
               class="field-focus w-full pl-8 pr-3 py-2.5 rounded-xl text-sm" placeholder="가격" />
           </div>
           <div class="relative">
-            <input id="cigaretteCount" type="number" min="0" step="1"
-              class="field-focus w-full px-3 py-2.5 rounded-xl text-sm pr-10" placeholder="개비 수" />
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">개비</span>
+            <input id="cigQtyInput" type="number" min="0" step="1"
+              class="field-focus w-full px-3 py-2.5 rounded-xl text-sm pr-12" placeholder="면세한도: 200개비" />
+            <span id="cigQtyUnit" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">개비</span>
           </div>
         </div>
+        <p id="cigTaxNote" class="hidden text-xs text-slate-500 mt-2 bg-slate-100 rounded-lg px-3 py-1.5"></p>
         <p id="cigaretteMsg" class="text-xs mt-2 hidden"></p>
       </div>
     </div>
