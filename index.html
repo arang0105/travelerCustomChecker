@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>여행자 세관 관세 계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+
+    /* 숫자 입력 화살표 제거 */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    /* 포커스 링 */
+    .field-focus:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+    }
+
+    /* 애니메이션 */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.25s ease; }
+
+    @keyframes pulse-once {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.04); }
+    }
+    .pulse-once { animation: pulse-once 0.4s ease; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-indigo-50 min-h-screen font-sans">
+
+  <!-- 헤더 -->
+  <header class="bg-indigo-600 text-white shadow-lg">
+    <div class="max-w-2xl mx-auto px-4 py-5 flex items-center gap-3">
+      <span class="text-3xl">✈️</span>
+      <div>
+        <h1 class="text-xl font-bold leading-tight">여행자 관세 계산기</h1>
+        <p class="text-indigo-200 text-xs mt-0.5">입국 시 예상 관세를 간편하게 확인하세요</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+    <!-- ① 환율 카드 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+          <span>💱</span> 적용 환율 (USD → KRW)
+        </h2>
+        <button id="refreshRateBtn"
+          class="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+          <svg id="refreshIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          새로고침
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="flex-1 relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₩</span>
+          <input id="exchangeRate" type="number" min="1" step="1"
+            class="field-focus w-full pl-7 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50
+                   text-slate-800 font-semibold text-lg transition"
+            placeholder="환율 로딩 중..." />
+        </div>
+        <span class="text-slate-400 text-sm whitespace-nowrap">/ $1</span>
+      </div>
+
+      <p id="rateInfo" class="text-xs text-slate-400 mt-2">환율 정보를 불러오는 중입니다...</p>
+    </section>
+
+    <!-- ② 면세 한도 안내 -->
+    <section class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+      <h2 class="font-semibold text-amber-800 flex items-center gap-2 mb-3">
+        <span>ℹ️</span> 면세 한도 안내
+      </h2>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div class="bg-white rounded-xl p-3 border border-amber-100">
+          <p class="text-amber-600 font-medium text-xs uppercase tracking-wide mb-1">기본 면세</p>
+          <p class="text-slate-700 font-semibold">$800</p>
+          <p class="text-slate-500 text-xs">일반 물품 합산</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 border border-amber-100">
+          <p class="text-amber-600 font-medium text-xs uppercase tracking-wide mb-1">주류 (별도)</p>
+          <p class="text-slate-700 font-semibold">2병 · 2L · $400</p>
+          <p class="text-slate-500 text-xs">세 조건 모두 충족</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 border border-amber-100">
+          <p class="text-amber-600 font-medium text-xs uppercase tracking-wide mb-1">향수 (별도)</p>
+          <p class="text-slate-700 font-semibold">100ml</p>
+          <p class="text-slate-500 text-xs">용량 기준</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 border border-amber-100">
+          <p class="text-amber-600 font-medium text-xs uppercase tracking-wide mb-1">담배 (별도)</p>
+          <p class="text-slate-700 font-semibold">200개비</p>
+          <p class="text-slate-500 text-xs">궐련 기준</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 일반 품목 리스트 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+          <span>🛍️</span> 일반 품목 목록
+        </h2>
+        <button id="addItemBtn"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-xl
+                 flex items-center gap-1.5 transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          품목 추가
+        </button>
+      </div>
+
+      <div id="itemList" class="space-y-3">
+        <!-- 품목이 JS로 동적 추가됨 -->
+      </div>
+
+      <p id="emptyHint" class="text-center text-slate-400 text-sm py-6">
+        "+ 품목 추가" 버튼으로 구매 물품을 입력하세요
+      </p>
+
+      <!-- 일반 품목 소계 -->
+      <div id="generalSubtotal" class="hidden mt-4 pt-4 border-t border-slate-100 flex justify-between text-sm">
+        <span class="text-slate-500">일반 품목 합계</span>
+        <span id="generalTotal" class="font-semibold text-slate-700">$0</span>
+      </div>
+    </section>
+
+    <!-- ④ 별도 면세 품목 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+      <h2 class="font-semibold text-slate-700 flex items-center gap-2 mb-4">
+        <span>🍷</span> 별도 면세 품목
+      </h2>
+
+      <!-- 주류 -->
+      <div class="mb-4">
+        <label class="text-sm font-medium text-slate-600 flex items-center gap-2 mb-2">
+          주류
+          <span class="text-xs text-slate-400 font-normal">(2병·2L·$400 이하 면세)</span>
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+            <input id="alcoholPrice" type="number" min="0" step="0.01"
+              class="field-focus w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="가격" />
+          </div>
+          <div class="relative">
+            <input id="alcoholBottles" type="number" min="0" max="99" step="1"
+              class="field-focus w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="병 수" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">병</span>
+          </div>
+          <div class="relative col-span-2">
+            <input id="alcoholVolume" type="number" min="0" step="0.1"
+              class="field-focus w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="총 용량 (L)" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">L</span>
+          </div>
+        </div>
+        <p id="alcoholMsg" class="text-xs mt-1.5 hidden"></p>
+      </div>
+
+      <!-- 향수 -->
+      <div class="mb-4">
+        <label class="text-sm font-medium text-slate-600 flex items-center gap-2 mb-2">
+          향수
+          <span class="text-xs text-slate-400 font-normal">(100ml 이하 면세)</span>
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+            <input id="perfumePrice" type="number" min="0" step="0.01"
+              class="field-focus w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="가격" />
+          </div>
+          <div class="relative">
+            <input id="perfumeVolume" type="number" min="0" step="1"
+              class="field-focus w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="용량" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">ml</span>
+          </div>
+        </div>
+        <p id="perfumeMsg" class="text-xs mt-1.5 hidden"></p>
+      </div>
+
+      <!-- 담배 -->
+      <div>
+        <label class="text-sm font-medium text-slate-600 flex items-center gap-2 mb-2">
+          담배
+          <span class="text-xs text-slate-400 font-normal">(200개비 이하 면세)</span>
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+            <input id="cigarettePrice" type="number" min="0" step="0.01"
+              class="field-focus w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="가격" />
+          </div>
+          <div class="relative">
+            <input id="cigaretteCount" type="number" min="0" step="1"
+              class="field-focus w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm transition"
+              placeholder="개비 수" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">개비</span>
+          </div>
+        </div>
+        <p id="cigaretteMsg" class="text-xs mt-1.5 hidden"></p>
+      </div>
+    </section>
+
+    <!-- ⑤ 자진신고 옵션 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <div class="relative mt-0.5">
+          <input id="selfDeclare" type="checkbox"
+            class="peer sr-only" />
+          <div class="w-5 h-5 rounded border-2 border-slate-300 peer-checked:bg-indigo-600
+                      peer-checked:border-indigo-600 transition-all flex items-center justify-center">
+            <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <p class="font-medium text-slate-700">자진신고 감면 적용</p>
+          <p class="text-xs text-slate-500 mt-0.5">산출 세액의 30% 감면 · 최대 15만원 한도</p>
+        </div>
+      </label>
+    </section>
+
+    <!-- ⑥ 계산 버튼 -->
+    <button id="calcBtn"
+      class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold
+             py-4 rounded-2xl text-lg shadow-lg transition-all duration-150 flex items-center
+             justify-center gap-2">
+      <span>🧮</span> 관세 계산하기
+    </button>
+
+    <!-- ⑦ 결과 카드 -->
+    <section id="resultCard"
+      class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-5 fade-in">
+      <h2 class="font-semibold text-slate-700 flex items-center gap-2 mb-4">
+        <span>📊</span> 계산 결과
+      </h2>
+
+      <!-- 계산 내역 -->
+      <div class="space-y-2 text-sm mb-5" id="breakdown"></div>
+
+      <!-- 최종 납부액 강조 -->
+      <div class="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
+        <p class="text-indigo-500 text-sm mb-1" id="resultLabel">예상 납부 관세</p>
+        <p id="resultAmount" class="text-4xl font-extrabold text-indigo-700 tracking-tight pulse-once">
+          ₩0
+        </p>
+        <p id="resultUsd" class="text-indigo-400 text-xs mt-1"></p>
+        <p id="selfDeclareNote" class="hidden text-green-600 text-xs mt-2 font-medium">
+          ✅ 자진신고 감면 적용됨
+        </p>
+      </div>
+
+      <!-- 면세 안내 -->
+      <div id="dutyFreeNotice"
+        class="hidden mt-4 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+        <p class="text-green-700 text-sm font-medium">🎉 면세 범위 이내입니다!</p>
+        <p class="text-green-600 text-xs mt-1">별도로 신고하실 필요가 없습니다.</p>
+      </div>
+
+      <!-- 면책 고지 -->
+      <p class="text-xs text-slate-400 mt-4 leading-relaxed">
+        ※ 본 계산기는 참고용이며, 실제 관세는 품목·원산지·과세표준에 따라 달라질 수 있습니다.
+        정확한 내용은 <a href="https://www.customs.go.kr" target="_blank"
+          class="text-indigo-400 underline">관세청 공식 사이트</a>를 확인하세요.
+      </p>
+    </section>
+
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="max-w-2xl mx-auto px-4 py-6 text-center text-xs text-slate-400">
+    환율 데이터 제공: <a href="https://www.frankfurter.app" target="_blank"
+      class="underline hover:text-slate-600">frankfurter.app</a> · 관세청 간이세율 기준
+  </footer>
+
+  <script>
+    /* ====================================================
+       유틸
+    ==================================================== */
+    const $ = id => document.getElementById(id);
+    const fmt = n => Math.round(n).toLocaleString("ko-KR");
+
+    /* ====================================================
+       환율 로드
+    ==================================================== */
+    let exchangeRate = 1350; // 기본값 (API 실패 시 폴백)
+
+    async function loadRate() {
+      const btn  = $("refreshRateBtn");
+      const icon = $("refreshIcon");
+      btn.disabled = true;
+      icon.classList.add("animate-spin");
+
+      try {
+        // Cloudflare Pages Functions 엔드포인트
+        const res  = await fetch("/api/rate");
+        const data = await res.json();
+
+        exchangeRate = data.rate;
+        $("exchangeRate").value = exchangeRate;
+
+        const src  = data.source === "fallback" ? "⚠️ 폴백(고정값)" : "✅ 실시간";
+        $("rateInfo").textContent =
+          `${src} · 기준일: ${data.date} · 출처: ${data.source}`;
+      } catch (e) {
+        $("rateInfo").textContent = "⚠️ 환율 로드 실패 — 기본값 ₩1,350 사용 중";
+        $("exchangeRate").value = exchangeRate;
+      } finally {
+        btn.disabled = false;
+        icon.classList.remove("animate-spin");
+      }
+    }
+
+    $("exchangeRate").addEventListener("input", () => {
+      const v = parseFloat($("exchangeRate").value);
+      if (v > 0) {
+        exchangeRate = v;
+        $("rateInfo").textContent = "✏️ 수동 입력 환율이 적용됩니다.";
+      }
+    });
+
+    $("refreshRateBtn").addEventListener("click", loadRate);
+
+    /* ====================================================
+       품목 관리
+    ==================================================== */
+    let items  = [];
+    let nextId = 1;
+
+    function renderItems() {
+      const list  = $("itemList");
+      const hint  = $("emptyHint");
+      const sub   = $("generalSubtotal");
+
+      list.innerHTML = "";
+
+      if (items.length === 0) {
+        hint.classList.remove("hidden");
+        sub.classList.add("hidden");
+        return;
+      }
+
+      hint.classList.add("hidden");
+      sub.classList.remove("hidden");
+
+      let total = 0;
+      items.forEach(item => {
+        total += item.price;
+
+        const el = document.createElement("div");
+        el.className =
+          "fade-in flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100";
+        el.innerHTML = `
+          <input type="text" value="${item.name}"
+            class="field-focus flex-1 min-w-0 bg-transparent text-sm text-slate-700
+                   border-none focus:ring-0 placeholder-slate-300"
+            placeholder="품목명 (예: 코트)"
+            onchange="updateItem(${item.id}, 'name', this.value)" />
+          <div class="relative shrink-0 w-28">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+            <input type="number" min="0" step="0.01" value="${item.price || ""}"
+              class="field-focus w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200
+                     bg-white text-sm text-right transition"
+              placeholder="0.00"
+              onchange="updateItem(${item.id}, 'price', parseFloat(this.value)||0)" />
+          </div>
+          <button onclick="removeItem(${item.id})"
+            class="text-slate-300 hover:text-red-400 transition-colors shrink-0 p-1 rounded-lg
+                   hover:bg-red-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>`;
+        list.appendChild(el);
+      });
+
+      $("generalTotal").textContent = `$${total.toFixed(2)}`;
+    }
+
+    function addItem() {
+      items.push({ id: nextId++, name: "", price: 0 });
+      renderItems();
+      // 마지막 추가된 품목의 이름 필드 포커스
+      const inputs = $("itemList").querySelectorAll("input[type=text]");
+      inputs[inputs.length - 1]?.focus();
+    }
+
+    window.updateItem = (id, field, value) => {
+      const item = items.find(i => i.id === id);
+      if (item) {
+        item[field] = value;
+        if (field === "price") renderItems();
+      }
+    };
+
+    window.removeItem = id => {
+      items = items.filter(i => i.id !== id);
+      renderItems();
+    };
+
+    $("addItemBtn").addEventListener("click", addItem);
+
+    /* ====================================================
+       별도 면세 품목 유효성 메시지
+    ==================================================== */
+    function setMsg(elId, text, ok) {
+      const el = $(elId);
+      el.textContent = text;
+      el.className = `text-xs mt-1.5 ${ok ? "text-green-600" : "text-amber-600"}`;
+      el.classList.remove("hidden");
+    }
+
+    /* ====================================================
+       관세 계산 메인 로직
+    ==================================================== */
+    $("calcBtn").addEventListener("click", calculate);
+
+    function calculate() {
+      const rate = parseFloat($("exchangeRate").value) || exchangeRate;
+
+      /* --- 일반 품목 합계 (USD) --- */
+      const generalTotal = items.reduce((s, i) => s + (parseFloat(i.price) || 0), 0);
+
+      /* --- 별도 면세: 주류 --- */
+      const alcPrice   = parseFloat($("alcoholPrice").value)   || 0;
+      const alcBottles = parseFloat($("alcoholBottles").value)  || 0;
+      const alcVolume  = parseFloat($("alcoholVolume").value)   || 0;
+
+      const alcDutyFree =
+        alcBottles <= 2 && alcVolume <= 2 && alcPrice <= 400;
+      const alcTaxable  = alcDutyFree ? 0 : alcPrice;
+
+      if (alcPrice > 0) {
+        if (alcDutyFree) setMsg("alcoholMsg", "✅ 주류 면세 조건 충족", true);
+        else {
+          const reasons = [];
+          if (alcBottles > 2) reasons.push(`병 수 초과(${alcBottles}병)`);
+          if (alcVolume  > 2) reasons.push(`용량 초과(${alcVolume}L)`);
+          if (alcPrice   > 400) reasons.push(`가격 초과($${alcPrice})`);
+          setMsg("alcoholMsg", `⚠️ 면세 초과 — ${reasons.join(", ")}`, false);
+        }
+      } else {
+        $("alcoholMsg").classList.add("hidden");
+      }
+
+      /* --- 별도 면세: 향수 --- */
+      const perfPrice  = parseFloat($("perfumePrice").value)  || 0;
+      const perfVolume = parseFloat($("perfumeVolume").value)  || 0;
+
+      const perfDutyFree = perfVolume <= 100;
+      const perfTaxable  = perfDutyFree ? 0 : perfPrice;
+
+      if (perfPrice > 0) {
+        if (perfDutyFree) setMsg("perfumeMsg", "✅ 향수 면세 조건 충족", true);
+        else setMsg("perfumeMsg", `⚠️ 용량 초과 (${perfVolume}ml > 100ml)`, false);
+      } else {
+        $("perfumeMsg").classList.add("hidden");
+      }
+
+      /* --- 별도 면세: 담배 --- */
+      const cigPrice = parseFloat($("cigarettePrice").value) || 0;
+      const cigCount = parseFloat($("cigaretteCount").value) || 0;
+
+      const cigDutyFree = cigCount <= 200;
+      const cigTaxable  = cigDutyFree ? 0 : cigPrice;
+
+      if (cigPrice > 0) {
+        if (cigDutyFree) setMsg("cigaretteMsg", "✅ 담배 면세 조건 충족", true);
+        else setMsg("cigaretteMsg", `⚠️ 수량 초과 (${cigCount}개비 > 200개비)`, false);
+      } else {
+        $("cigaretteMsg").classList.add("hidden");
+      }
+
+      /* --- 일반 품목 과세 기준액 ($800 공제) --- */
+      const GENERAL_EXEMPT = 800; // USD
+      const generalTaxable = Math.max(0, generalTotal - GENERAL_EXEMPT);
+
+      /* --- 총 과세 대상 (USD) --- */
+      const totalTaxableUSD = generalTaxable + alcTaxable + perfTaxable + cigTaxable;
+
+      /* --- 세율 적용 (간이세율 20%) --- */
+      // 고가품(시계·가방·보석 등)의 경우 실제 세율이 다를 수 있음 — 단순화를 위해 생략
+      const TAX_RATE = 0.20;
+      const rawTaxUSD = totalTaxableUSD * TAX_RATE;
+      const rawTaxKRW = rawTaxUSD * rate;
+
+      /* --- 자진신고 감면 (30%, 최대 15만원) --- */
+      const selfDeclare = $("selfDeclare").checked;
+      let discount = 0;
+      if (selfDeclare && rawTaxKRW > 0) {
+        discount = Math.min(rawTaxKRW * 0.30, 150_000);
+      }
+      const finalTaxKRW = Math.max(0, rawTaxKRW - discount);
+
+      /* --- 결과 렌더링 --- */
+      const card = $("resultCard");
+      card.classList.remove("hidden");
+
+      // 내역 테이블
+      const bd = $("breakdown");
+      bd.innerHTML = "";
+
+      function addRow(label, value, highlight = false) {
+        const row = document.createElement("div");
+        row.className = `flex justify-between ${highlight ? "font-semibold text-slate-800" : "text-slate-500"}`;
+        row.innerHTML = `<span>${label}</span><span>${value}</span>`;
+        bd.appendChild(row);
+      }
+      function addDivider() {
+        const div = document.createElement("hr");
+        div.className = "border-slate-100 my-2";
+        bd.appendChild(div);
+      }
+
+      addRow("일반 품목 합계", `$${generalTotal.toFixed(2)}`);
+      addRow("기본 면세 공제", `-$${Math.min(generalTotal, GENERAL_EXEMPT).toFixed(2)}`);
+      addRow("일반 과세 대상", `$${generalTaxable.toFixed(2)}`, true);
+      addDivider();
+
+      if (alcPrice > 0)  addRow(`주류 과세 대상`, alcDutyFree  ? "면세" : `$${alcTaxable.toFixed(2)}`);
+      if (perfPrice > 0) addRow(`향수 과세 대상`, perfDutyFree ? "면세" : `$${perfTaxable.toFixed(2)}`);
+      if (cigPrice > 0)  addRow(`담배 과세 대상`, cigDutyFree  ? "면세" : `$${cigTaxable.toFixed(2)}`);
+
+      addDivider();
+      addRow("총 과세 대상액", `$${totalTaxableUSD.toFixed(2)}`, true);
+      addRow("간이세율 20% 적용", `$${rawTaxUSD.toFixed(2)} (₩${fmt(rawTaxKRW)})`);
+
+      if (selfDeclare && discount > 0) {
+        addRow("자진신고 감면 (30%)", `-₩${fmt(discount)}`);
+      }
+
+      // 결과 강조
+      const isFree = finalTaxKRW === 0;
+      $("resultLabel").textContent   = isFree ? "납부 관세 없음" : "예상 납부 관세";
+      $("resultAmount").textContent  = `₩${fmt(finalTaxKRW)}`;
+      $("resultUsd").textContent     =
+        isFree ? "" : `(약 $${(finalTaxKRW / rate).toFixed(2)})`;
+      $("selfDeclareNote").classList.toggle("hidden", !selfDeclare || rawTaxKRW === 0);
+      $("dutyFreeNotice").classList.toggle("hidden", !isFree);
+
+      // 스크롤
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      // 애니메이션 리트리거
+      $("resultAmount").classList.remove("pulse-once");
+      void $("resultAmount").offsetWidth;
+      $("resultAmount").classList.add("pulse-once");
+    }
+
+    /* ====================================================
+       초기 로드
+    ==================================================== */
+    loadRate();
+  </script>
+</body>
+</html>
