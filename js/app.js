@@ -112,10 +112,11 @@ const fmtC = (n, step) =>
 const pct  = r  => `${Math.round(r * 100)}%`;
 
 /* ─── 상태 ──────────────────────────────────────── */
-let allRates    = {};
-let currentCode = "USD";
-let items       = [];   // { id, name, price, category }
-let nextId      = 1;
+let allRates         = {};
+let currentCode      = "USD";
+let items            = [];   // { id, name, price, category }
+let nextId           = 1;
+let capturedImageB64 = null; // 사진 Base64 문자열 (추후 AI API 전송용)
 
 const country = () => COUNTRIES.find(c => c.code === currentCode);
 
@@ -581,6 +582,54 @@ function renderBreakdown(d) {
 }
 
 $("calcBtn").addEventListener("click", calculate);
+
+/* ─── 사진 촬영 / 업로드 ──────────────────────────
+   - photoBtn 클릭 → 숨겨진 <input type="file"> 트리거
+   - accept="image/*"  : 모바일에서 카메라·사진첩 모두 선택 가능
+   - capture 속성 미사용 : 카메라 강제 진입 없이 OS 선택창 표시
+   ─────────────────────────────────────────────── */
+$("photoBtn").addEventListener("click", () => {
+  $("photoInput").value = "";   // 같은 파일 재선택도 감지하도록 초기화
+  $("photoInput").click();
+});
+
+$("photoInput").addEventListener("change", function () {
+  const file = this.files?.[0];
+  if (!file) return;
+
+  /* 파일 크기 표시 포맷 */
+  const fmtSize = bytes => {
+    if (bytes < 1024)       return `${bytes} B`;
+    if (bytes < 1024 ** 2)  return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
+  };
+
+  /* ── FileReader로 Base64 변환 ── */
+  const reader = new FileReader();
+  reader.onload = e => {
+    capturedImageB64 = e.target.result;   // data:image/...;base64,xxxx
+
+    /* 미리보기 업데이트 */
+    $("photoThumbnail").src       = capturedImageB64;
+    $("photoFileName").textContent = file.name;
+    $("photoFileSize").textContent = `${fmtSize(file.size)} · ${file.type || "image"}`;
+    $("photoPreviewArea").classList.remove("hidden");
+    $("photoPreviewArea").classList.add("fade-in");
+  };
+  reader.onerror = () => {
+    capturedImageB64 = null;
+    alert("이미지를 읽는 중 오류가 발생했습니다. 다시 시도해 주세요.");
+  };
+  reader.readAsDataURL(file);
+});
+
+/* 사진 제거 버튼 */
+$("photoRemoveBtn").addEventListener("click", () => {
+  capturedImageB64 = null;
+  $("photoInput").value    = "";
+  $("photoThumbnail").src  = "";
+  $("photoPreviewArea").classList.add("hidden");
+});
 
 /* ─── 초기화 ────────────────────────────────────── */
 initToggle();
