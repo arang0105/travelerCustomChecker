@@ -277,17 +277,18 @@
   /* ====================================================
      국가/통화 데이터
   ==================================================== */
+  // displayUnit: 네이버 기준 표시 단위 (JPY·VND는 100단위, 나머지는 1단위)
   const COUNTRIES = [
-    { code:"USD", flag:"🇺🇸", name:"미국",      symbol:"$",    unit:"달러",       step:"0.01" },
-    { code:"JPY", flag:"🇯🇵", name:"일본",      symbol:"¥",    unit:"엔",         step:"1"    },
-    { code:"THB", flag:"🇹🇭", name:"태국",      symbol:"฿",    unit:"바트",       step:"0.01" },
-    { code:"VND", flag:"🇻🇳", name:"베트남",    symbol:"₫",    unit:"동",         step:"1"    },
-    { code:"PHP", flag:"🇵🇭", name:"필리핀",    symbol:"₱",    unit:"페소",       step:"0.01" },
-    { code:"HKD", flag:"🇭🇰", name:"홍콩",      symbol:"HK$",  unit:"홍콩달러",   step:"0.01" },
-    { code:"TWD", flag:"🇹🇼", name:"대만",      symbol:"NT$",  unit:"대만달러",   step:"0.01" },
-    { code:"SGD", flag:"🇸🇬", name:"싱가포르",  symbol:"S$",   unit:"싱가포르달러", step:"0.01" },
-    { code:"CNY", flag:"🇨🇳", name:"중국",      symbol:"¥",    unit:"위안",       step:"0.01" },
-    { code:"EUR", flag:"🇪🇺", name:"유럽",      symbol:"€",    unit:"유로",       step:"0.01" },
+    { code:"USD", flag:"🇺🇸", name:"미국",      symbol:"$",    unit:"달러",           step:"0.01", displayUnit:1   },
+    { code:"JPY", flag:"🇯🇵", name:"일본",      symbol:"¥",    unit:"엔",             step:"1",    displayUnit:100 },
+    { code:"THB", flag:"🇹🇭", name:"태국",      symbol:"฿",    unit:"바트",           step:"0.01", displayUnit:1   },
+    { code:"VND", flag:"🇻🇳", name:"베트남",    symbol:"₫",    unit:"동",             step:"1",    displayUnit:100 },
+    { code:"PHP", flag:"🇵🇭", name:"필리핀",    symbol:"₱",    unit:"페소",           step:"0.01", displayUnit:1   },
+    { code:"HKD", flag:"🇭🇰", name:"홍콩",      symbol:"HK$",  unit:"홍콩달러",       step:"0.01", displayUnit:1   },
+    { code:"TWD", flag:"🇹🇼", name:"대만",      symbol:"NT$",  unit:"대만달러",       step:"0.01", displayUnit:1   },
+    { code:"SGD", flag:"🇸🇬", name:"싱가포르",  symbol:"S$",   unit:"싱가포르달러",   step:"0.01", displayUnit:1   },
+    { code:"CNY", flag:"🇨🇳", name:"중국",      symbol:"¥",    unit:"위안",           step:"0.01", displayUnit:1   },
+    { code:"EUR", flag:"🇪🇺", name:"유럽",      symbol:"€",    unit:"유로",           step:"0.01", displayUnit:1   },
   ];
 
   /* ====================================================
@@ -303,7 +304,12 @@
   let nextId      = 1;
 
   const country = () => COUNTRIES.find(c => c.code === currentCode);
-  const curRate = () => parseFloat($("exchangeRate").value) || allRates[currentCode] || 1350;
+  // 화면에 표시된 값은 displayUnit 단위 → 1단위로 되돌려서 반환
+  const curRate = () => {
+    const c = country();
+    const displayed = parseFloat($("exchangeRate").value) || ((allRates[currentCode] || 1350) * c.displayUnit);
+    return displayed / c.displayUnit;  // KRW per 1 unit
+  };
   const usdRate = () => allRates["USD"] || 1350;
 
   /* ====================================================
@@ -340,16 +346,35 @@
     btn.disabled = true;
     icon.classList.add("animate-spin");
 
-    try {
-      const res  = await fetch("/api/rate");
-      const data = await res.json();
-      allRates = data.rates;
+    const CODES = ["USD","JPY","THB","VND","PHP","HKD","TWD","SGD","CNY","EUR"];
 
-      const src = data.source === "fallback" ? "⚠️ 폴백(고정값)" : "✅ 실시간";
-      $("rateInfo").textContent = `${src} · ${data.date} · ${data.source}`;
+    try {
+      // ① open.er-api.com 직접 호출 (CORS 허용, Workers/Pages 모두 작동)
+      const res  = await fetch("https://open.er-api.com/v6/latest/USD");
+      if (!res.ok) throw new Error(`${res.status}`);
+      const raw  = await res.json();
+      const krwPerUsd = raw.rates.KRW;
+      if (!krwPerUsd) throw new Error("KRW 없음");
+
+      allRates = {};
+      for (const cur of CODES) {
+        if (raw.rates[cur]) allRates[cur] = Math.round((krwPerUsd / raw.rates[cur]) * 1000) / 1000;
+      }
+      const date = raw.time_last_update_utc?.slice(0, 16) ?? "";
+      $("rateInfo").textContent = `✅ 실시간 · ${date} · open.er-api.com`;
     } catch (e) {
-      $("rateInfo").textContent = "⚠️ 환율 로드 실패 — 기본값 사용 중";
-      allRates = { USD:1350, JPY:9.2, THB:38, VND:0.053, PHP:24, HKD:173, TWD:42, SGD:1010, CNY:186, EUR:1480 };
+      // ② /api/rate (Cloudflare Pages Functions — Pages 배포 시 활성화)
+      try {
+        const res2 = await fetch("/api/rate");
+        if (!res2.ok) throw new Error("Pages Function 없음");
+        const data = await res2.json();
+        allRates = data.rates;
+        $("rateInfo").textContent = `✅ 실시간 · ${data.date} · ${data.source}`;
+      } catch {
+        // ③ 하드코딩 폴백
+        allRates = { USD:1350, JPY:9.2, THB:38, VND:0.053, PHP:24, HKD:173, TWD:42, SGD:1010, CNY:186, EUR:1480 };
+        $("rateInfo").textContent = "⚠️ 환율 로드 실패 — 임시 기본값 적용 중";
+      }
     } finally {
       btn.disabled = false;
       icon.classList.remove("animate-spin");
@@ -358,17 +383,17 @@
   }
 
   function updateRateDisplay() {
-    const c    = country();
-    const rate = allRates[currentCode] ?? 1350;
+    const c       = country();
+    const rawRate = allRates[currentCode] ?? 1350;          // KRW per 1 unit
+    const display = +(rawRate * c.displayUnit).toFixed(2);  // KRW per displayUnit units
 
-    $("exchangeRate").value = rate;
+    $("exchangeRate").value     = display;
+    $("exchangeRate").step      = c.displayUnit >= 100 ? "0.01" : "0.01";
     $("rateSymbol").textContent = "₩";
-    $("rateLabel").textContent  = `/ 1${c.symbol} (${c.unit})`;
+    // 네이버처럼 "/ 100¥ (엔)" 또는 "/ $1 (달러)" 형식
+    $("rateLabel").textContent  = `/ ${c.displayUnit > 1 ? c.displayUnit : ""}${c.symbol} (${c.unit})`;
 
-    // 면세 한도 현지 통화 환산 표시
-    const usdR = usdRate();
-    const rate_ = parseFloat($("exchangeRate").value) || rate;
-    updateExemptDisplay(rate_, usdR);
+    updateExemptDisplay(rawRate, usdRate());
   }
 
   function updateExemptDisplay(rate, usdR) {
@@ -385,11 +410,13 @@
   }
 
   $("exchangeRate").addEventListener("input", () => {
-    const v = parseFloat($("exchangeRate").value);
-    if (v > 0) {
-      allRates[currentCode] = v;
+    const displayed = parseFloat($("exchangeRate").value);
+    const c = country();
+    if (displayed > 0) {
+      // 표시값(displayUnit 기준) → 1단위 KRW로 환산 후 저장
+      allRates[currentCode] = displayed / c.displayUnit;
       $("rateInfo").textContent = "✏️ 수동 입력 환율 적용 중";
-      updateExemptDisplay(v, usdRate());
+      updateExemptDisplay(allRates[currentCode], usdRate());
     }
   });
   $("refreshRateBtn").addEventListener("click", loadRate);
