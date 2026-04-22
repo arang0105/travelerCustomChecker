@@ -1,0 +1,159 @@
+/* =====================================================
+   여행자 관세 계산기 — 스타일시트
+   ===================================================== */
+
+/* 폰트 */
+* { font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif; }
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 4px; }
+
+/* 숫자 입력 화살표 제거 */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+/* ─── 배경 ─────────────────────────────────────── */
+body {
+  background: #f0f4ff;
+  background-image:
+    radial-gradient(at 20% 10%, rgba(99,102,241,0.12) 0%, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(168,85,247,0.10) 0%, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(236,254,255,0.8) 0%, transparent 70%);
+  min-height: 100vh;
+}
+
+/* ─── 헤더 ─────────────────────────────────────── */
+.header-gradient {
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 50%, #7c3aed 100%);
+  position: relative;
+  overflow: hidden;
+}
+.header-gradient::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ─── 카드 (글래스모피즘) ───────────────────────── */
+.card {
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.8);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
+}
+.card:hover {
+  box-shadow: 0 8px 32px rgba(99,102,241,0.13), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ─── 섹션 타이틀 ──────────────────────────────── */
+.section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e1b4b;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ─── 국가 버튼 ────────────────────────────────── */
+.country-btn {
+  transition: all 0.18s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.country-btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(99,102,241,0.08), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.country-btn:hover::after { opacity: 1; }
+.country-btn.active {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+  transform: translateY(-1px);
+}
+.country-btn.active .currency-code { color: rgba(255,255,255,0.8); }
+
+/* ─── 입력 필드 ────────────────────────────────── */
+.field-focus {
+  transition: all 0.18s;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+}
+.field-focus:focus {
+  outline: none;
+  border-color: #818cf8;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+/* ─── 계산 버튼 ────────────────────────────────── */
+.calc-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+}
+.calc-btn:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  box-shadow: 0 6px 28px rgba(99,102,241,0.5);
+  transform: translateY(-1px);
+}
+.calc-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+}
+
+/* ─── 결과 카드 ────────────────────────────────── */
+.result-glow {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #5b21b6 100%);
+  box-shadow: 0 8px 40px rgba(79,70,229,0.35);
+}
+
+/* ─── 배지 ─────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ─── 환율 입력 ────────────────────────────────── */
+#exchangeRate {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e1b4b;
+}
+
+/* ─── 내역 행 ──────────────────────────────────── */
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.breakdown-row:last-child { border-bottom: none; }
+
+/* ─── 애니메이션 ───────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeSlideIn 0.3s cubic-bezier(.4,0,.2,1); }
+
+@keyframes pulse-once {
+  0%,100% { transform: scale(1); }
+  40%     { transform: scale(1.06); }
+}
+.pulse-once { animation: pulse-once 0.45s ease; }
