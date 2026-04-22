@@ -176,6 +176,18 @@
           <span class="font-normal text-rose-400">(2병 · 2L · $400 이하 면세)</span>
         </p>
         <div class="grid grid-cols-2 gap-2">
+          <!-- 품목 선택 드롭다운 (면세 초과 시 세율 결정) -->
+          <div class="col-span-2">
+            <select id="alcoholType"
+              class="field-focus w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer">
+              <option value="WINE">🍷 포도주 (와인) — 68%</option>
+              <option value="WHISKEY">🥃 위스키 / 브랜디 / 보드카 / 진 / 럼 — 155%</option>
+              <option value="SAKE">🍶 사케 (일본청주) — 68%</option>
+              <option value="BEER">🍺 맥주 — 46% (단순화)</option>
+              <option value="GAOLIANG">🍾 고량주 — 155%</option>
+              <option value="OTHER">🍸 기타 주류 — 68%</option>
+            </select>
+          </div>
           <div class="relative">
             <span id="alcSymbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
             <input id="alcoholPrice" type="number" min="0" step="0.01"
@@ -300,11 +312,17 @@
       </div>
 
       <!-- 면책 고지 -->
-      <p class="text-xs text-slate-400 text-center leading-relaxed px-2">
-        ※ 참고용 계산기입니다. 실제 관세는 품목·원산지에 따라 다를 수 있으니
-        <a href="https://www.customs.go.kr" target="_blank"
-          class="text-indigo-400 underline font-medium">관세청 공식 사이트</a>에서 확인하세요.
-      </p>
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+        <p class="text-xs text-slate-500 leading-relaxed">
+          ⚠️ 이 계산 결과는 관세청의 <strong>'고시환율'</strong>이 아닌
+          <strong>'실시간 환율'</strong>을 기준으로 하므로 실제 납부액과 차이가 있을 수 있습니다.
+        </p>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          ※ 참고용 계산기입니다. 실제 관세는 품목·HS Code·원산지·협정세율에 따라 다를 수 있으니
+          <a href="https://www.customs.go.kr" target="_blank"
+            class="text-indigo-400 underline font-medium">관세청 공식 사이트</a>에서 확인하세요.
+        </p>
+      </div>
     </div>
 
   </main>
