@@ -171,6 +171,21 @@ function selectCountry(code) {
 }
 
 /* ─── 환율 로드 ─────────────────────────────────── */
+const RATE_CACHE_KEY = "tcc_rates_cache";   // localStorage 키
+
+function saveRateCache(rates, date) {
+  try {
+    localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rates, date }));
+  } catch { /* 시크릿 모드 등 localStorage 차단 환경 무시 */ }
+}
+
+function loadRateCache() {
+  try {
+    const raw = localStorage.getItem(RATE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 async function loadRate() {
   const btn  = $("refreshRateBtn");
   const icon = $("refreshIcon");
@@ -195,6 +210,7 @@ async function loadRate() {
       }
     }
     const date = raw.time_last_update_utc?.slice(0, 16) ?? "";
+    saveRateCache(allRates, date);   // ✅ 성공 시 캐시 저장
     $("rateInfo").textContent = `✅ 실시간 환율 · ${date} UTC`;
 
   } catch {
@@ -204,15 +220,23 @@ async function loadRate() {
       if (!r2.ok) throw new Error("없음");
       const d2 = await r2.json();
       allRates = d2.rates;
+      saveRateCache(allRates, d2.date);   // ✅ 성공 시 캐시 저장
       $("rateInfo").textContent = `✅ 실시간 · ${d2.date} · ${d2.source}`;
     } catch {
-      // ③ 하드코딩 폴백
-      allRates = {
-        USD:1350, JPY:9.2, THB:38,  VND:0.053,
-        PHP:24,   HKD:173, TWD:42,  SGD:1010,
-        CNY:186,  EUR:1480,
-      };
-      $("rateInfo").textContent = "⚠️ 환율 로드 실패 — 임시 기본값 적용";
+      // ③ localStorage에 저장된 마지막 성공 환율 사용
+      const cached = loadRateCache();
+      if (cached) {
+        allRates = cached.rates;
+        $("rateInfo").textContent = `⚠️ API 실패 — 마지막 저장 환율 (${cached.date}) 적용 중`;
+      } else {
+        // ④ 최초 접속 + API 전부 실패 시 최후 하드코딩 폴백
+        allRates = {
+          USD:1350, JPY:9.2, THB:38,  VND:0.053,
+          PHP:24,   HKD:173, TWD:42,  SGD:1010,
+          CNY:186,  EUR:1480,
+        };
+        $("rateInfo").textContent = "⚠️ 환율 로드 실패 — 기본값 적용 (앱 첫 실행)";
+      }
     }
   } finally {
     btn.disabled = false;
@@ -584,12 +608,22 @@ function renderBreakdown(d) {
 $("calcBtn").addEventListener("click", calculate);
 
 /* ─── 사진 촬영 / 업로드 ──────────────────────────
-   - photoBtn 클릭 → 숨겨진 <input type="file"> 트리거
-   - accept="image/*"  : 모바일에서 카메라·사진첩 모두 선택 가능
-   - capture 속성 미사용 : 카메라 강제 진입 없이 OS 선택창 표시
+   보안 · 비용 제어 포인트:
+   ① MIME 타입 검증  — image/* 외 파일 차단
+   ② 파일 크기 제한  — 5 MB 초과 차단
+   ③ EXIF 제거       — Canvas 리드로잉으로 GPS·기기 정보 제거
+   ④ 이미지 리사이즈 — 최대 1024px (AI API 토큰 비용 절감)
    ─────────────────────────────────────────────── */
+
+/* 파일 크기 표시 포맷 (사진 섹션 전체에서 사용) */
+const fmtFileSize = bytes => {
+  if (bytes < 1024)      return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
+};
+
 $("photoBtn").addEventListener("click", () => {
-  $("photoInput").value = "";   // 같은 파일 재선택도 감지하도록 초기화
+  $("photoInput").value = "";   // 같은 파일 재선택도 change 이벤트 발생하도록 초기화
   $("photoInput").click();
 });
 
@@ -597,37 +631,66 @@ $("photoInput").addEventListener("change", function () {
   const file = this.files?.[0];
   if (!file) return;
 
-  /* 파일 크기 표시 포맷 */
-  const fmtSize = bytes => {
-    if (bytes < 1024)       return `${bytes} B`;
-    if (bytes < 1024 ** 2)  return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
-  };
+  /* ── ① MIME 타입 검증 ── */
+  if (!file.type.startsWith("image/")) {
+    alert("이미지 파일만 업로드 가능합니다.");
+    this.value = "";
+    return;
+  }
 
-  /* ── FileReader로 Base64 변환 ── */
-  const reader = new FileReader();
-  reader.onload = e => {
-    capturedImageB64 = e.target.result;   // data:image/...;base64,xxxx
+  /* ── ② 파일 크기 제한 (5 MB) ── */
+  const MAX_BYTES = 5 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    alert(`5 MB 이하 사진만 업로드 가능합니다.\n현재 파일: ${fmtFileSize(file.size)}`);
+    this.value = "";
+    return;
+  }
+
+  /* ── ③ EXIF 제거 + ④ 리사이즈 (Canvas 리드로잉) ──
+     Canvas에 다시 그리면 EXIF 메타데이터(GPS 등)가 자동으로 제거됨
+     최대 1024px로 축소 → AI API 호출 시 토큰 비용 절감 */
+  const objectUrl = URL.createObjectURL(file);
+  const img       = new Image();
+
+  img.onload = () => {
+    const MAX_PX = 1024;
+    const ratio  = Math.min(1, MAX_PX / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width  = Math.round(img.width  * ratio);
+    canvas.height = Math.round(img.height * ratio);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    capturedImageB64 = canvas.toDataURL("image/jpeg", 0.85);
+    URL.revokeObjectURL(objectUrl);   // 메모리 즉시 해제
+
+    /* 처리 후 크기 계산 (Base64 → 실제 바이트 근사) */
+    const processedBytes = Math.round(capturedImageB64.length * 0.75);
+    const sizeLabel = file.size !== processedBytes
+      ? `${fmtFileSize(file.size)} → ${fmtFileSize(processedBytes)} (리사이즈)`
+      : fmtFileSize(processedBytes);
 
     /* 미리보기 업데이트 */
-    $("photoThumbnail").src       = capturedImageB64;
+    $("photoThumbnail").src        = capturedImageB64;
     $("photoFileName").textContent = file.name;
-    $("photoFileSize").textContent = `${fmtSize(file.size)} · ${file.type || "image"}`;
+    $("photoFileSize").textContent = sizeLabel;
     $("photoPreviewArea").classList.remove("hidden");
     $("photoPreviewArea").classList.add("fade-in");
   };
-  reader.onerror = () => {
+
+  img.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
     capturedImageB64 = null;
-    alert("이미지를 읽는 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    alert("이미지를 읽을 수 없습니다. 다른 파일을 시도해 주세요.");
   };
-  reader.readAsDataURL(file);
+
+  img.src = objectUrl;
 });
 
 /* 사진 제거 버튼 */
 $("photoRemoveBtn").addEventListener("click", () => {
-  capturedImageB64 = null;
-  $("photoInput").value    = "";
-  $("photoThumbnail").src  = "";
+  capturedImageB64       = null;
+  $("photoInput").value  = "";
+  $("photoThumbnail").src = "";
   $("photoPreviewArea").classList.add("hidden");
 });
 
